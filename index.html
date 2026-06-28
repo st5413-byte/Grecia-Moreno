@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual House Explorer & Listening Challenge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600;700&display=swap');
+    body { font-family: 'Quicksand', sans-serif; background-color: #f0f7ff; }
+    h1, h2, h3, .font-kids { font-family: 'Fredoka One', cursive; }
+    .room-slide-enter { opacity: 0; transform: translateX(100px) scale(0.95); }
+    .room-slide-active { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); opacity: 1; transform: translateX(0) scale(1); }
+    .room-slide-exit { opacity: 0; transform: translateX(-100px) scale(0.95); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+    @keyframes pulse-highlight {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.8)); }
+      50% { filter: drop-shadow(0 0 16px rgba(59, 130, 246, 1)) brightness(1.1); }
+    }
+    @keyframes quiz-pulse {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.8)); }
+      50% { filter: drop-shadow(0 0 20px rgba(236, 72, 153, 1)) brightness(1.15); }
+    }
+    .interactive-item { cursor: pointer; transition: all 0.3s ease; }
+    .interactive-item:hover { filter: drop-shadow(0 0 12px #3b82f6) brightness(1.05); transform: scale(1.02); transform-origin: center; }
+    .game-target-active { animation: pulse-highlight 2s infinite; }
+    .quiz-target-highlight { animation: quiz-pulse 1.8s infinite; }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .shimmer-loading { background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite linear; }
+    @keyframes record-pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      50% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+    }
+    .recording-active { animation: record-pulse 1.5s infinite; background-color: #ef4444 !important; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden select-none">
+
+  <div id="welcome-landing" class="fixed inset-0 bg-gradient-to-br from-blue-500 to-indigo-700 z-[100] flex flex-col items-center justify-center p-6 text-center text-white transition-opacity duration-500">
+    <div class="bg-white/10 backdrop-blur-md p-8 rounded-3xl border border-white/20 max-w-md w-full shadow-2xl">
+      <div class="bg-white text-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+        <i class="fa-solid fa-house-chimney text-4xl"></i>
+      </div>
+      <h2 class="text-3xl font-kids mb-3 tracking-wide">House Explorer</h2>
+      <p class="text-sm text-blue-100 mb-8 leading-relaxed font-semibold">
+        An interactive virtual house tour with AI fun facts and audio quizzes! Tap below to enter and turn on learning voices.
+      </p>
+      <button onclick="unlockAudioAndStart()" class="w-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold py-4 px-6 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg font-kids tracking-wider">
+        <i class="fa-solid fa-volume-high text-xl"></i> Let's Play!
+      </button>
+    </div>
+  </div>
+
+  <header class="bg-white border-b-4 border-blue-100 shadow-sm sticky top-0 z-50 transition-all">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3 cursor-pointer hover:opacity-90" onclick="changeMode('explore')">
+        <div class="bg-blue-500 text-white p-2.5 rounded-2xl shadow-md transform rotate-[-2deg] hover:rotate-0 transition-transform">
+          <i class="fa-solid fa-house-chimney text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl md:text-3xl text-blue-600 tracking-wide">House Explorer</h1>
+          <p class="text-xs text-gray-500 font-semibold tracking-wider uppercase">Interactive Audio & AI Learning</p>
+        </div>
+      </div>
+      <div class="flex bg-slate-100 p-1.5 rounded-2xl border-2 border-slate-200">
+        <button id="btn-mode-explore" onclick="changeMode('explore')" class="px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all bg-white text-blue-600 shadow-sm">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Explore Room
+        </button>
+        <button id="btn-mode-challenge" onclick="changeMode('challenge')" class="px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all text-slate-600 hover:text-slate-800">
+          <i class="fa-solid fa-gamepad"></i> Quiz Arena
+        </button>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="flex flex-col items-end text-right">
+          <span class="text-xs text-gray-400 font-bold uppercase">Voice Engine</span>
+          <select id="voice-engine-select" class="text-xs font-semibold bg-slate-50 border border-slate-300 rounded px-2 py-1 text-slate-700 outline-none cursor-pointer focus:border-blue-500">
+            <option value="api" selected>✨ Gemini Neural Voice</option>
+            <option value="web">Web Speech Engine</option>
+          </select>
+        </div>
+        <button onclick="toggleSound()" id="sound-toggle-btn" class="bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100 p-2.5 rounded-xl transition-all" title="Toggle Sound FX">
+          <i id="sound-icon" class="fa-solid fa-volume-high text-lg"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 flex flex-col lg:flex-row gap-6 items-stretch">
+    <div class="flex-grow flex flex-col gap-4 w-full lg:w-3/4">
+      <nav class="grid grid-cols-5 bg-white p-2 rounded-2xl shadow-sm border border-slate-100 gap-1 md:gap-2">
+        <button onclick="goToRoom('living')" id="nav-living" class="room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all bg-blue-500 text-white shadow-md">
+          <i class="fa-solid fa-couch text-xl md:text-2xl mb-1"></i>
+          <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Living</span>
+        </button>
+        <button onclick="goToRoom('kitchen')" id="nav-kitchen" class="room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-kitchen-set text-xl md:text-2xl mb-1"></i>
+          <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Kitchen</span>
+        </button>
+        <button onclick="goToRoom('bedroom')" id="nav-bedroom" class="room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-bed text-xl md:text-2xl mb-1"></i>
+          <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Bedroom</span>
+        </button>
+        <button onclick="goToRoom('bathroom')" id="nav-bathroom" class="room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-bath text-xl md:text-2xl mb-1"></i>
+          <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Bath</span>
+        </button>
+        <button onclick="goToRoom('yard')" id="nav-yard" class="room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all text-slate-600 hover:bg-slate-50">
+          <i class="fa-solid fa-tree text-xl md:text-2xl mb-1"></i>
+          <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Yard</span>
+        </button>
+      </nav>
+
+      <div class="relative bg-white border border-slate-200/80 rounded-3xl shadow-lg p-3 md:p-6 flex flex-col items-center justify-center overflow-hidden min-h-[380px] md:min-h-[480px]">
+        <div id="hallway-transition" class="absolute inset-0 bg-slate-900 flex-col items-center justify-center z-40 hidden opacity-0 transition-opacity duration-300">
+          <div class="text-center text-white scale-95 transition-transform duration-300" id="hallway-content">
+            <i class="fa-solid fa-person-walking text-5xl mb-3 text-yellow-400 animate-bounce"></i>
+            <h3 class="text-2xl tracking-wide">Walking down the corridor...</h3>
+            <p class="text-sm text-slate-400" id="transition-target-text">Entering the Bedroom</p>
+          </div>
+        </div>
+        <div class="w-full flex items-center justify-between mb-4 border-b pb-2 border-slate-100 z-10">
+          <div class="flex items-center space-x-2">
+            <span id="room-icon-badge" class="bg-blue-100 text-blue-600 p-2 rounded-lg text-lg"><i class="fa-solid fa-couch"></i></span>
+            <h2 id="room-title" class="text-xl md:text-2xl text-slate-800">Living Room</h2>
+          </div>
+          <div class="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full font-semibold">
+            <span id="instruction-badge">Click on any object to hear it!</span>
+          </div>
+        </div>
+        <div class="w-full relative flex items-center justify-center z-10" id="canvas-wrapper">
+          <svg id="room-svg" class="w-full max-w-[700px] h-auto aspect-[4/3] bg-slate-50 rounded-2xl shadow-inner border border-slate-100 transition-all duration-300" viewBox="0 0 800 600"></svg>
+          <div id="hover-tooltip" class="absolute pointer-events-none bg-slate-900/95 text-white px-3 py-2 rounded-2xl text-xs font-bold shadow-2xl opacity-0 transition-all duration-150 z-30 flex flex-col items-center gap-0.5 border border-slate-700">
+            <span id="hover-tooltip-name" class="text-sm tracking-wide text-blue-400 font-kids">Television</span>
+            <span id="hover-tooltip-phonetic" class="text-[10px] text-slate-300 font-mono">/ˈtɛl.ɪ.vɪʒ.ən/</span>
+          </div>
+        </div>
+        <div id="speech-subtitles" class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-950/95 text-white px-6 py-3 rounded-full text-xs font-bold shadow-2xl opacity-0 translate-y-4 transition-all duration-300 z-30 flex items-center gap-3 border border-slate-800 max-w-[90%] text-center pointer-events-none">
+          <div class="flex gap-1 items-center shrink-0">
+            <span class="w-1.5 h-3 bg-blue-400 rounded-full animate-bounce [animation-duration:1s]"></span>
+            <span class="w-1.5 h-5 bg-blue-400 rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.2s]"></span>
+            <span class="w-1.5 h-3 bg-blue-400 rounded-full animate-bounce [animation-duration:1.2s] [animation-delay:0.4s]"></span>
+          </div>
+          <span id="speech-subtitles-text" class="text-sm text-slate-200 tracking-wide font-semibold">...</span>
+        </div>
+        <button onclick="navigateRoom(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-slate-700 shadow-md p-3 rounded-full hover:scale-110 active:scale-95 transition-all z-20 hover:text-blue-600">
+          <i class="fa-solid fa-arrow-left text-lg"></i>
+        </button>
+        <button onclick="navigateRoom(1)" class="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-slate-700 shadow-md p-3 rounded-full hover:scale-110 active:scale-95 transition-all z-20 hover:text-blue-600">
+          <i class="fa-solid fa-arrow-right text-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="w-full lg:w-1/4 flex flex-col gap-4">
+      <div id="panel-explore" class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg flex-grow flex flex-col justify-between">
+        <div>
+          <div class="flex items-center space-x-2 text-blue-600 mb-4">
+            <i class="fa-solid fa-magnifying-glass-retro text-xl"></i>
+            <h3 class="text-lg">Vocabulary Finder</h3>
+          </div>
+          <p class="text-sm text-slate-500 mb-5 leading-relaxed">Take a virtual tour of the house. Click any item on the screen to trigger neural pronunciation, learn its spelling, and see its usage!</p>
+          <div id="item-details-card" class="bg-slate-50 rounded-2xl p-5 border border-slate-100 text-center flex flex-col items-center justify-center min-h-[220px] transition-all">
+            <div id="item-details-empty" class="text-slate-400">
+              <i class="fa-regular fa-hand-pointer text-5xl mb-3 animate-pulse text-blue-300"></i>
+              <p class="font-bold text-sm">No item selected</p>
+              <p class="text-xs mt-1">Tap objects in the current room!</p>
+            </div>
+            <div id="item-details-full" class="hidden w-full">
+              <div class="bg-blue-100 text-blue-700 w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <i id="selected-item-icon" class="fa-solid fa-tv text-2xl"></i>
+              </div>
+              <h4 id="selected-item-name" class="text-2xl text-slate-800 tracking-wider">Television</h4>
+              <p id="selected-item-pronunciation" class="text-xs font-semibold text-blue-500 tracking-widest uppercase mb-3">/ˈtɛlɪvɪʒən/</p>
+              <div class="flex flex-col gap-2 mb-4 w-full">
+                <button onclick="speakSelected()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all inline-flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-volume-high"></i> Listen Again
+                </button>
+                <button onclick="askAIFunFacts()" id="btn-ai-facts" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all inline-flex items-center justify-center gap-2">
+                  <span class="animate-bounce">✨</span> Ask AI Fun Facts
+                </button>
+              </div>
+              <div id="ai-facts-box" class="hidden text-left bg-purple-50 border border-purple-100 rounded-xl p-3 mb-3 text-xs text-purple-950">
+                <div class="flex items-center gap-1.5 font-bold mb-1 text-purple-700">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i><span>AI Fun Fact:</span>
+                </div>
+                <p id="ai-facts-text" class="italic leading-relaxed">Retrieving mind-blowing facts...</p>
+              </div>
+              <div class="border-t border-slate-200 pt-3 text-left">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Example Sentence</span>
+                <p id="selected-item-desc" class="text-xs text-slate-600 italic">"We watch our favorite movies on the big screen."</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6">
+          <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Room Checklist</h4>
+          <div id="room-checklist" class="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+
+      <div id="panel-challenge" class="bg-gradient-to-br from-indigo-950 to-slate-950 text-white rounded-3xl p-5 shadow-2xl flex-grow flex flex-col justify-between hidden border-2 border-indigo-900">
+        <div>
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-indigo-900/60">
+            <div class="flex items-center space-x-2 text-indigo-300">
+              <i class="fa-solid fa-trophy text-xl text-yellow-400 animate-pulse"></i>
+              <h3 class="text-lg">Quiz Arena</h3>
+            </div>
+            <div class="bg-indigo-950 px-3 py-1 rounded-full border border-indigo-800">
+              <span id="score-val" class="font-bold text-emerald-400 text-sm">0</span>
+              <span class="text-indigo-400 text-xs">/</span>
+              <span id="total-val" class="font-bold text-slate-400 text-sm">0</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 p-1 bg-indigo-950/80 rounded-2xl mb-4 border border-indigo-900">
+            <button onclick="setQuizGameType('find')" id="btn-quiz-find" class="py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all bg-indigo-600 text-white shadow">🔍 Find Object</button>
+            <button onclick="setQuizGameType('match')" id="btn-quiz-match" class="py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all text-indigo-300 hover:text-white">🧩 Match Name</button>
+            <button onclick="setQuizGameType('speak')" id="btn-quiz-speak" class="py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all text-indigo-300 hover:text-white">🎤 Speak Word</button>
+            <button onclick="setQuizGameType('complete')" id="btn-quiz-complete" class="py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all text-indigo-300 hover:text-white">✏️ Complete Word</button>
+          </div>
+          <div id="riddle-toggle-container" class="bg-indigo-950/40 p-1 rounded-xl flex gap-1 mb-4 text-xs font-bold border border-indigo-900">
+            <button id="btn-challenge-standard" onclick="setChallengeType('standard')" class="flex-1 py-1 rounded-lg text-[10px] text-center transition-all bg-indigo-600 text-white">Standard Voice</button>
+            <button id="btn-challenge-riddle" onclick="setChallengeType('riddle')" class="flex-1 py-1 rounded-lg text-[10px] text-center transition-all text-indigo-300 hover:text-white">✨ AI Riddle Quest</button>
+          </div>
+          <div class="bg-indigo-950/60 border border-indigo-900/80 rounded-2xl p-4 text-center flex flex-col items-center justify-center min-h-[190px] mb-4 relative overflow-hidden">
+            <div id="challenge-state-init">
+              <i class="fa-solid fa-gamepad text-5xl mb-3 text-indigo-400"></i>
+              <button onclick="startListeningChallenge()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-3 rounded-2xl font-bold shadow-md hover:shadow-lg transition-all block w-full text-sm">Start Challenge</button>
+            </div>
+            <div id="challenge-state-active" class="hidden w-full">
+              <div id="panel-sub-find" class="w-full">
+                <div id="challenge-riddle-box" class="hidden text-[11px] text-indigo-100 bg-indigo-900/60 border border-indigo-800 rounded-xl p-3 mb-4 leading-relaxed italic text-left">
+                  <div class="flex items-center gap-1.5 text-[9px] font-bold text-purple-400 uppercase tracking-widest mb-1"><span>✨ AI Riddle Prompt</span></div>
+                  <p id="challenge-riddle-text">Generating clever riddle clues...</p>
+                </div>
+                <p class="text-xs text-indigo-300 uppercase tracking-widest font-bold mb-3">Which object is this?</p>
+                <button onclick="replayChallengeSound()" id="challenge-play-btn" class="w-14 h-14 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg hover:scale-105 active:scale-95 transition-all group">
+                  <i class="fa-solid fa-volume-high text-xl group-hover:scale-110 transition-transform"></i>
+                </button>
+                <button onclick="replayChallengeSound()" class="text-xs text-indigo-400 hover:text-white transition-colors underline decoration-dotted">Repeat Sound</button>
+              </div>
+              <div id="panel-sub-match" class="hidden w-full">
+                <p class="text-xs text-pink-300 uppercase tracking-widest font-bold mb-4">What is the highlighted item?</p>
+                <div id="match-options-grid" class="flex flex-col gap-2"></div>
+              </div>
+              <div id="panel-sub-speak" class="hidden w-full">
+                <p class="text-xs text-emerald-300 uppercase tracking-widest font-bold mb-2">Pronounce this item name!</p>
+                <h4 id="speak-target-word" class="text-2xl font-bold tracking-wider text-white font-kids mb-4">Television</h4>
+                <button onclick="startVoiceRecognition()" id="btn-speak-mic" class="w-16 h-16 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg hover:scale-105 active:scale-95 transition-all">
+                  <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
+                </button>
+                <p id="speak-status-text" class="text-xs text-slate-400 italic">Click the mic and speak clearly</p>
+                <p id="speak-result-text" class="text-xs text-yellow-400 font-bold mt-2 hidden">We heard: "..."</p>
+              </div>
+              <div id="panel-sub-complete" class="hidden w-full">
+                <p class="text-xs text-orange-300 uppercase tracking-widest font-bold mb-3">Spelling Quiz: Fill in the Blanks!</p>
+                <div id="spelling-blank-container" class="flex justify-center gap-1.5 mb-4"></div>
+                <div id="spelling-keyboard-container" class="grid grid-cols-4 gap-1 max-w-[200px] mx-auto"></div>
+              </div>
+              <p id="challenge-room-hint" class="text-xs text-indigo-300/80 mt-4 italic bg-indigo-900/30 py-1.5 px-3 rounded-lg border border-indigo-900/40">Hint: Check around the room!</p>
+            </div>
+            <div id="feedback-overlay" class="absolute inset-0 rounded-2xl flex flex-col items-center justify-center bg-emerald-950/95 border-2 border-emerald-500 hidden z-20">
+              <div class="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center mb-2">
+                <i id="feedback-icon" class="fa-solid fa-check text-2xl text-white"></i>
+              </div>
+              <h4 id="feedback-title" class="text-xl font-bold text-emerald-400">Excellent!</h4>
+              <p id="feedback-text" class="text-xs text-emerald-200 mt-1">That is indeed the couch!</p>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 pt-4 border-t border-indigo-900/60">
+          <div class="flex justify-between text-xs font-bold text-indigo-300 mb-1">
+            <span>Accuracy Meter</span><span id="accuracy-percentage">0%</span>
+          </div>
+          <div class="w-full bg-indigo-950 rounded-full h-2 overflow-hidden border border-indigo-900">
+            <div id="accuracy-bar" class="bg-emerald-400 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="reward-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 hidden">
+    <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 text-center border-4 border-yellow-400 shadow-2xl">
+      <div class="relative inline-block mb-4">
+        <i class="fa-solid fa-trophy text-6xl text-yellow-500 animate-bounce"></i>
+        <i class="fa-solid fa-star absolute -top-2 -right-2 text-2xl text-amber-400 animate-pulse"></i>
+      </div>
+      <h3 class="text-2xl text-slate-800 mb-2 font-kids">Congratulations Master!</h3>
+      <p class="text-sm text-slate-500 mb-6 leading-relaxed">You successfully found all of the objects in the house listening game! Outstanding listening skills.</p>
+      <button onclick="closeRewardModal()" class="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-bold py-3 px-6 rounded-2xl w-full shadow-lg transition-all">Keep Exploring!</button>
+    </div>
+  </div>
+
+  <div id="toast-notification" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-3 transition-transform translate-y-24 pointer-events-none z-50 border border-slate-800">
+    <div class="bg-blue-500 text-white p-2 rounded-xl text-sm" id="toast-icon-bg">
+      <i id="toast-icon" class="fa-solid fa-info"></i>
+    </div>
+    <div>
+      <h5 id="toast-title" class="text-xs font-bold text-slate-400 uppercase tracking-wider">Alert</h5>
+      <p id="toast-body" class="text-sm text-slate-100 font-semibold">Message contents...</p>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>&copy; 2026 House Explorer Studio. Enhanced with Gemini AI.</p>
+      <div class="flex space-x-3 text-slate-400">
+        <a href="#" class="hover:text-blue-500 transition-colors">Safety</a>
+        <span>&bull;</span>
+        <a href="#" class="hover:text-blue-500 transition-colors">Curriculum</a>
+        <span>&bull;</span>
+        <a href="#" class="hover:text-blue-500 transition-colors">Help</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const apiKey = "";
+
+    let currentRoom = 'living';
+    let appMode = 'explore';
+    let challengeType = 'standard';
+    let quizGameType = 'find';
+    let activeRiddleText = "";
+    let selectedItem = null;
+    let soundEffectsEnabled = true;
+    let score = 0;
+    let totalQuestions = 0;
+    let challengeActive = false;
+    let currentChallengeItem = null;
+    let currentChallengeRoomKey = null;
+    let discoveredItems = {};
+    let spellingHiddenWord = "";
+    let spellingBlanks = [];
+
+    const roomsOrder = ['living', 'kitchen', 'bedroom', 'bathroom', 'yard'];
+
+    const fallbackFacts = {
+      tv: "Did you know that the first TV station started over 90 years ago, and all the shows were in black and white?",
+      sofa: "Did you know that the word 'sofa' comes from an Arabic word 'suffah', which means a cozy wooden bench covered in carpets?",
+      lamp: "Did you know that the oldest lamps in the world were made of hollow rocks filled with animal fat and a wick?",
+      window: "Did you know that before glass was invented, people used animal skins or flattened horns to cover their windows?",
+      painting: "Did you know that the most famous painting in the world, the Mona Lisa, has no eyebrows?",
+      fishtank: "Did you know that goldfish have a memory span of up to three months, not just three seconds?",
+      fridge: "Did you know that before refrigerators, people built giant 'ice houses' near lakes to keep food cold all summer?",
+      stove: "Did you know that people used to cook on open clay fire pits inside their homes before stoves were invented?",
+      sink: "Did you know that clean running water was first brought into houses using lead pipes by the ancient Romans?",
+      table: "Did you know that the oldest tables were made by ancient Egyptians out of stone and wood?",
+      bed: "Did you know that ancient Egyptian kings had beds made of gold, while ordinary people slept on palm branches?",
+      wardrobe: "Did you know that wardrobes were originally giant wooden chests used to protect knight armor and weapons?",
+      toybox: "Did you know that the oldest toy ever discovered is a tiny clay doll that is over 4,000 years old!",
+      computer: "Did you know that the first computer was so gigantic it was as big as a whole bedroom?",
+      bathtub: "Did you know that the ancient Greeks invented the first bathtubs, and some were even made of solid gold?",
+      mirror: "Did you know that the earliest mirrors were made of polished obsidian stones from active volcanoes?",
+      toilet: "Did you know that the first flushing toilet was designed for Queen Elizabeth I in 1596, but she was too scared to use it!",
+      towel: "Did you know that towels can be made out of bamboo grass, which makes them extra soft and quick-drying!",
+      rug: "Did you know that in ancient times, rugs were used as warm walls in cold tents before they were placed on the floor?",
+      tree: "Did you know that trees talk to each other underground using a secret network of roots and mushrooms?",
+      doghouse: "Did you know that some dog houses are so fancy they have their own air conditioning and flat-screen TVs?",
+      grill: "Did you know that the word 'barbecue' comes from a Taíno word 'barbacoa' which means a wooden rack for cooking over smoke?",
+      flower: "Did you know that sunflowers can grow as tall as a small house and love to turn their heads toward the warm sun!",
+      swing: "Did you know that the earliest swings in history were made of tree vines tied to branches thousands of years ago!"
+    };
+
+    const fallbackRiddles = {
+      tv: "I have a flat screen and show you cartoons and movies. What am I?",
+      sofa: "I am a long, soft seat with cushions where the family sits to watch TV. What am I?",
+      lamp: "I stand on the floor and shine a bright light to help you read in the dark. What am I?",
+      window: "I am a clear glass pane in the wall that lets you look outside at the garden. What am I?",
+      painting: "I hang on the wall and show a beautiful picture of colors and shapes, but I never talk. What am I?",
+      fishtank: "I am a glass home filled with bubbles and water where colorful little pets swim all day. What am I?",
+      fridge: "I am a cold, electric cabinet that keeps your milk fresh and juice chilly. What am I?",
+      stove: "I am a hot kitchen element where you boil yummy soups and fry delicious eggs. What am I?",
+      sink: "I have a metal faucet and a bowl where you wash dirty dishes and rinse fruits. What am I?",
+      table: "I have four wooden legs and a flat top where the family sits to eat breakfast, lunch, and dinner. What am I?",
+      bed: "I have a cozy mattress, fluffy pillows, and a soft blanket for you to sleep on. What am I?",
+      wardrobe: "I am a tall wooden cupboard with hangers where you keep your clothes and coats. What am I?",
+      toybox: "I am a colorful wooden chest filled with blocks, action figures, and dolls. What am I?",
+      computer: "I have a glowing screen and a keyboard, and I let you play games or do your schoolwork. What am I?",
+      bathtub: "I am a big white tub in the bathroom where you soak in warm soapy bubbles. What am I?",
+      mirror: "I hang on the wall and show you a reflection of your smile when you brush your teeth. What am I?",
+      toilet: "I am a white porcelain seat that you flush with water after going to the potty. What am I?",
+      towel: "I am soft and dry, and I get wetter and wetter the more you dry yourself off. What am I?",
+      rug: "I sit on the cold bathroom floor to keep your toes cozy and dry after a bath. What am I?",
+      tree: "I am a tall green plant in the yard with strong branches for birds to build nests on. What am I?",
+      doghouse: "I am a small wooden shelter in the grass with a red roof made just for a puppy. What am I?",
+      grill: "I cook burgers and hot dogs over warm charcoal in the backyard during summertime. What am I?",
+      flower: "We grow in the dirt, smell very sweet, and have colorful petals that bees love to visit. What are we?",
+      swing: "I hang from a tall tree branch by strong ropes, allowing you to fly back and forth in the wind. What am I?"
+    };
+
+    const roomsData = {
+      living: {
+        title: "Living Room", icon: "couch", color: "#e2e8f0", wallColor: "#bfdbfe", floorColor: "#854d0e",
+        items: [
+          { id: "tv", name: "Television", phonetic: "/ˈtɛl.ɪ.vɪʒ.ən/", icon: "tv", desc: "A screen we watch to enjoy favorite shows and interactive animated movies together.", svg: `<rect x="250" y="320" width="300" height="80" rx="10" fill="#475569" /><rect x="370" y="400" width="60" height="50" fill="#334155" /><ellipse cx="400" cy="450" rx="70" ry="15" fill="#1e293b" /><rect x="220" y="120" width="360" height="220" rx="15" fill="#0f172a" class="interactive-item" id="item-tv" /><rect x="235" y="135" width="330" height="190" rx="6" fill="#1e293b" class="interactive-item" id="item-tv-screen" /><polygon points="235,135 480,135 235,325" fill="white" opacity="0.04" /><rect x="280" y="350" width="100" height="20" rx="5" fill="#1e293b" /><circle cx="490" cy="360" r="10" fill="#38bdf8" opacity="0.8" /><circle cx="515" cy="360" r="10" fill="#fb7185" opacity="0.8" />` },
+          { id: "sofa", name: "Sofa", phonetic: "/ˈsoʊ.fə/", icon: "couch", desc: "A soft, comfy long seat with beautiful pillows where the whole family sits to relax.", svg: `<g class="interactive-item" id="item-sofa"><rect x="180" y="360" width="440" height="130" rx="25" fill="#f43f5e" /><rect x="140" y="410" width="70" height="90" rx="20" fill="#e11d48" /><rect x="590" y="410" width="70" height="90" rx="20" fill="#e11d48" /><rect x="200" y="430" width="200" height="70" rx="15" fill="#fda4af" /><rect x="400" y="430" width="200" height="70" rx="15" fill="#fda4af" /><rect x="170" y="495" width="25" height="20" fill="#78350f" rx="3" /><rect x="605" y="495" width="25" height="20" fill="#78350f" rx="3" /><rect x="220" y="390" width="60" height="60" rx="10" fill="#f59e0b" transform="rotate(-15 250 420)" /><rect x="520" y="390" width="60" height="60" rx="10" fill="#06b6d4" transform="rotate(15 550 420)" /></g>` },
+          { id: "lamp", name: "Lamp", phonetic: "/læmp/", icon: "lightbulb", desc: "A floor light fixture that glows brightly to keep the room warm and readable at night.", svg: `<g class="interactive-item" id="item-lamp"><ellipse cx="690" cy="520" rx="40" ry="10" fill="#64748b" /><rect x="685" y="160" width="10" height="360" fill="#94a3b8" /><polygon points="640,160 740,160 760,60 620,60" fill="#fef08a" stroke="#eab308" stroke-width="4" /><polygon points="620,160 760,160 810,480 570,480" fill="url(#lamp-glow)" opacity="0.15" style="pointer-events: none;" /></g>` },
+          { id: "window", name: "Window", phonetic: "/ˈwɪn.doʊ/", icon: "window-maximize", desc: "An opening in the wall made of clear glass that lets beautiful warm sunlight shine inside.", svg: `<g class="interactive-item" id="item-window"><rect x="40" y="60" width="130" height="190" rx="8" fill="#e2e8f0" stroke="#94a3b8" stroke-width="10" /><rect x="45" y="65" width="120" height="180" rx="4" fill="#bae6fd" /><circle cx="80" cy="100" r="15" fill="white" opacity="0.9" /><circle cx="100" cy="100" r="20" fill="white" opacity="0.9" /><circle cx="140" cy="90" r="12" fill="#f59e0b" /><line x1="105" y1="65" x2="105" y2="245" stroke="#94a3b8" stroke-width="6" /><line x1="45" y1="150" x2="165" y2="150" stroke="#94a3b8" stroke-width="6" /><path d="M45,65 Q80,120 45,245" fill="#f43f5e" opacity="0.8" /><path d="M165,65 Q130,120 165,245" fill="#f43f5e" opacity="0.8" /></g>` },
+          { id: "painting", name: "Painting", phonetic: "/ˈpeɪn.tɪŋ/", icon: "image", desc: "A colorful piece of art hanging on the wall that shows a beautiful landscape.", svg: `<g class="interactive-item" id="item-painting"><rect x="340" y="20" width="120" height="80" fill="#a16207" rx="4" /><rect x="350" y="28" width="100" height="64" fill="#f0fdfa" /><circle cx="420" cy="45" r="12" fill="#fef08a" /><path d="M350,75 L380,55 L410,78 L430,62 L450,80 Z" fill="#22c55e" /><path d="M380,80 L400,68 L420,80 Z" fill="#15803d" /></g>` },
+          { id: "fishtank", name: "Fish Tank", phonetic: "/ˈfɪʃ.tæŋk/", icon: "fish", desc: "A glass bowl filled with water, colorful pebbles, bubbles, and swimming little gold fish.", svg: `<g class="interactive-item" id="item-fishtank"><rect x="30" y="420" width="120" height="110" fill="#475569" rx="8" /><rect x="40" y="440" width="45" height="80" rx="3" fill="#334155" /><rect x="95" y="440" width="45" height="80" rx="3" fill="#334155" /><rect x="40" y="320" width="100" height="100" rx="10" fill="#bae6fd" stroke="#38bdf8" stroke-width="4" /><rect x="44" y="335" width="92" height="81" fill="#7dd3fc" opacity="0.6" rx="4" /><ellipse cx="90" cy="370" rx="12" ry="7" fill="#fb923c" /><polygon points="100,370 106,364 106,376" fill="#fb923c" /><circle cx="85" cy="368" r="1.5" fill="black" /><circle cx="55" cy="410" r="5" fill="#94a3b8" /><circle cx="70" cy="412" r="4" fill="#64748b" /><circle cx="95" cy="410" r="6" fill="#f43f5e" opacity="0.7" /><circle cx="115" cy="411" r="5" fill="#e2e8f0" /><circle cx="85" cy="350" r="3" fill="white" opacity="0.8" /><circle cx="92" cy="335" r="2" fill="white" opacity="0.8" /></g>` }
+        ]
+      },
+      kitchen: {
+        title: "Kitchen", icon: "kitchen-set", color: "#f8fafc", wallColor: "#fed7aa", floorColor: "#7c2d12",
+        items: [
+          { id: "fridge", name: "Refrigerator", phonetic: "/rɪˈfrɪdʒ.ə.reɪ.tər/", icon: "snowflake", desc: "An electric cupboard that keeps our fruits, vegetables, and milk icy-cold and super fresh.", svg: `<g class="interactive-item" id="item-fridge"><rect x="100" y="80" width="180" height="420" rx="15" fill="#cbd5e1" stroke="#94a3b8" stroke-width="4" /><rect x="105" y="85" width="170" height="160" rx="8" fill="#e2e8f0" /><rect x="105" y="255" width="170" height="235" rx="8" fill="#e2e8f0" /><rect x="250" y="140" width="15" height="70" rx="5" fill="#475569" /><rect x="250" y="275" width="15" height="90" rx="5" fill="#475569" /><rect x="135" y="140" width="40" height="50" rx="5" fill="#64748b" /><rect x="145" y="170" width="20" height="15" fill="#0f172a" /><rect x="130" y="290" width="30" height="30" fill="#fef08a" transform="rotate(-5 130 290)" /><rect x="175" y="295" width="25" height="25" fill="#a5f3fc" transform="rotate(10 175 295)" /></g>` },
+          { id: "stove", name: "Stove", phonetic: "/stoʊv/", icon: "fire", desc: "A hot counter element used to heat pans, fry delicious eggs, and boil comforting soups.", svg: `<g class="interactive-item" id="item-stove"><rect x="360" y="280" width="220" height="220" rx="10" fill="#475569" /><rect x="350" y="260" width="240" height="25" rx="5" fill="#1e293b" /><ellipse cx="410" cy="272" rx="30" ry="8" fill="#334155" /><ellipse cx="510" cy="272" rx="30" ry="8" fill="#334155" /><path d="M395,268 Q410,245 425,268 Z" fill="#38bdf8" opacity="0.8" /><path d="M495,268 Q510,245 525,268 Z" fill="#f97316" opacity="0.8" /><rect x="390" y="325" width="160" height="110" rx="8" fill="#0f172a" /><rect x="410" y="340" width="120" height="80" rx="4" fill="#fb923c" opacity="0.2" /><rect x="390" y="300" width="160" height="12" rx="6" fill="#94a3b8" /><circle cx="390" cy="272" r="6" fill="#f1f5f9" /><circle cx="430" cy="272" r="6" fill="#f1f5f9" /><circle cx="530" cy="272" r="6" fill="#f1f5f9" /><circle cx="570" cy="272" r="6" fill="#f1f5f9" /></g>` },
+          { id: "sink", name: "Kitchen Sink", phonetic: "/sɪŋk/", icon: "faucet", desc: "Where we wash sticky plates, rinse healthy apples, and clean dirty hands with soapy water.", svg: `<g class="interactive-item" id="item-sink"><rect x="580" y="300" width="200" height="200" fill="#334155" /><rect x="560" y="280" width="230" height="20" rx="5" fill="#f1f5f9" /><ellipse cx="680" cy="290" rx="65" ry="12" fill="#cbd5e1" /><path d="M680,280 L680,220 Q680,200 660,200 L650,200" stroke="#94a3b8" stroke-width="12" fill="none" stroke-linecap="round" /><circle cx="665" cy="280" r="7" fill="#ef4444" /><circle cx="695" cy="280" r="7" fill="#3b82f6" /><rect x="644" y="205" width="6" height="80" fill="#38bdf8" opacity="0.6" /></g>` },
+          { id: "table", name: "Table", phonetic: "/ˈteɪ.bəl/", icon: "table", desc: "A flat wooden furniture where the family gathers together to eat meals and talk.", svg: `<g class="interactive-item" id="item-table"><rect x="250" y="470" width="40" height="110" fill="#f59e0b" rx="5" /><rect x="240" y="515" width="50" height="8" rx="2" fill="#d97706" /><line x1="260" y1="520" x2="260" y2="580" stroke="#b45309" stroke-width="6" /><line x1="280" y1="520" x2="280" y2="580" stroke="#b45309" stroke-width="6" /><rect x="470" y="470" width="40" height="110" fill="#f59e0b" rx="5" /><rect x="470" y="515" width="50" height="8" rx="2" fill="#d97706" /><line x1="480" y1="520" x2="480" y2="580" stroke="#b45309" stroke-width="6" /><line x1="500" y1="520" x2="500" y2="580" stroke="#b45309" stroke-width="6" /><rect x="290" y="490" width="180" height="15" rx="5" fill="#b45309" /><rect x="280" y="475" width="200" height="15" rx="4" fill="#d97706" /><rect x="310" y="505" width="12" height="75" fill="#78350f" rx="3" /><rect x="438" y="505" width="12" height="75" fill="#78350f" rx="3" /><path d="M360,475 C360,460 400,460 400,475 Z" fill="#e2e8f0" /><circle cx="372" cy="468" r="6" fill="#ef4444" /><circle cx="388" cy="468" r="6" fill="#f59e0b" /></g>` }
+        ]
+      },
+      bedroom: {
+        title: "Bedroom", icon: "bed", color: "#faf5ff", wallColor: "#e9d5ff", floorColor: "#a16207",
+        items: [
+          { id: "bed", name: "Bed", phonetic: "/bɛd/", icon: "bed", desc: "The cozy furniture with a soft mattress and thick blanket where we sleep and dream comfortably all night.", svg: `<g class="interactive-item" id="item-bed"><rect x="80" y="240" width="30" height="260" rx="8" fill="#7c2d12" /><rect x="100" y="320" width="340" height="150" rx="10" fill="#f1f5f9" /><path d="M180,320 L430,320 Q440,320 440,330 L440,460 Q440,470 430,470 L180,470 Z" fill="#8b5cf6" /><path d="M180,320 L240,320 L210,470 L180,470 Z" fill="#a78bfa" opacity="0.5" /><rect x="120" y="335" width="60" height="100" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" transform="rotate(-10 150 385)" /><rect x="130" y="345" width="55" height="100" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" transform="rotate(10 155 395)" /><circle cx="350" cy="380" r="25" fill="#b45309" /><circle cx="335" cy="360" r="10" fill="#b45309" /><circle cx="365" cy="360" r="10" fill="#b45309" /><ellipse cx="350" cy="387" rx="10" ry="7" fill="#f59e0b" /><circle cx="350" cy="384" r="3" fill="#000" /></g>` },
+          { id: "wardrobe", name: "Wardrobe", phonetic: "/ˈwɔːr.droʊb/", icon: "door-closed", desc: "A tall wooden cupboard with hangers used to store and organize shirts, pants, sweaters, and shoes.", svg: `<g class="interactive-item" id="item-wardrobe"><rect x="540" y="80" width="180" height="420" rx="12" fill="#7c2d12" stroke="#451a03" stroke-width="6" /><rect x="550" y="90" width="75" height="400" rx="5" fill="#9a3412" /><rect x="628" y="90" width="75" height="400" rx="5" fill="#9a3412" /><rect x="610" y="260" width="10" height="60" rx="4" fill="#fbbf24" /><rect x="633" y="260" width="10" height="60" rx="4" fill="#fbbf24" /><path d="M540,80 Q630,50 720,80" fill="none" stroke="#451a03" stroke-width="8" /></g>` },
+          { id: "toybox", name: "Toy Box", phonetic: "/tɔɪ bɒks/", icon: "box-open", desc: "A colorful chest full of action figures, building blocks, dolls, and wonderful surprise games.", svg: `<g class="interactive-item" id="item-toybox"><rect x="360" y="430" width="100" height="80" rx="10" fill="#eab308" stroke="#ca8a04" stroke-width="3" /><rect x="350" y="420" width="120" height="15" rx="5" fill="#ca8a04" /><rect x="350" y="330" width="15" height="100" rx="5" fill="#ca8a04" transform="rotate(-35 350 420)" /><circle cx="380" cy="410" r="15" fill="#f43f5e" /><polygon points="420,390 435,420 405,420" fill="#06b6d4" /><path d="M435,415 L435,385 Q450,380 455,395 L450,415 Z" fill="#22c55e" /><circle cx="445" cy="390" r="2" fill="black" /></g>` },
+          { id: "computer", name: "Computer", phonetic: "/kəmˈpjuː.tər/", icon: "desktop", desc: "A smart screen on the desk used to play fun learning games, draw, and write stories.", svg: `<g class="interactive-item" id="item-computer"><rect x="450" y="320" width="80" height="180" fill="#78350f" rx="4" /><rect x="444" y="305" width="92" height="15" fill="#a16207" rx="3" /><circle cx="490" cy="340" r="5" fill="#fbbf24" /><rect x="460" y="220" width="60" height="45" rx="5" fill="#0f172a" /><rect x="465" y="225" width="50" height="32" rx="2" fill="#bae6fd" /><circle cx="480" cy="240" r="8" fill="#10b981" /><polygon points="477,240 483,240 480,235" fill="white" /><rect x="484" y="265" width="12" height="30" fill="#475569" /><ellipse cx="490" cy="295" rx="20" ry="5" fill="#334155" /><rect x="465" y="297" width="50" height="8" rx="2" fill="#e2e8f0" /><line x1="470" y1="301" x2="510" y2="301" stroke="#94a3b8" stroke-dasharray="2 1" stroke-width="2" /></g>` }
+        ]
+      },
+      bathroom: {
+        title: "Bathroom", icon: "bath", color: "#f0fdfa", wallColor: "#99f6e4", floorColor: "#cbd5e1",
+        items: [
+          { id: "bathtub", name: "Bathtub", phonetic: "/ˈbæθ.tʌb/", icon: "bath", desc: "A giant oval bowl that fills with warm water and bubbles so we can soak and play with rubber ducks.", svg: `<g class="interactive-item" id="item-bathtub"><path d="M120,340 L480,340 C530,340 550,380 550,440 C550,500 510,510 460,510 L140,510 C90,510 50,500 50,440 C50,380 70,340 120,340 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="6" /><ellipse cx="300" cy="350" rx="230" ry="25" fill="#e2e8f0" /><ellipse cx="300" cy="350" rx="210" ry="17" fill="#38bdf8" opacity="0.3" /><circle cx="160" cy="335" r="14" fill="white" opacity="0.9" /><circle cx="180" cy="330" r="18" fill="white" opacity="0.9" /><circle cx="210" cy="340" r="12" fill="white" opacity="0.9" /><circle cx="400" cy="335" r="16" fill="white" opacity="0.9" /><circle cx="420" cy="340" r="12" fill="white" opacity="0.9" /><path d="M100,340 L100,220 Q100,200 120,200 Q140,200 140,220 L130,220" stroke="#94a3b8" stroke-width="12" fill="none" /><g transform="translate(280, 315)"><path d="M10,20 Q30,20 30,10 Q35,5 45,10 Q40,20 30,25 Q15,25 10,20 Z" fill="#fbbf24" /><circle cx="35" cy="12" r="8" fill="#fbbf24" /><polygon points="41,12 47,15 41,17" fill="#f97316" /><circle cx="33" cy="10" r="1.5" fill="black" /></g><rect x="120" y="510" width="20" height="25" rx="5" fill="#64748b" /><rect x="460" y="510" width="20" height="25" rx="5" fill="#64748b" /></g>` },
+          { id: "mirror", name: "Mirror", phonetic: "/ˈmɪr.ər/", icon: "id-badge", desc: "A shiny glass hanging on the wall that shows a reflection of our happy smile when we brush our teeth.", svg: `<g class="interactive-item" id="item-mirror"><ellipse cx="640" cy="180" rx="80" ry="110" fill="#d97706" /><ellipse cx="640" cy="180" rx="68" ry="96" fill="#a5f3fc" /><path d="M590,120 Q640,160 620,260" stroke="white" stroke-width="10" fill="none" opacity="0.4" stroke-linecap="round" /><circle cx="580" cy="95" r="10" fill="#f43f5e" /><circle cx="580" cy="95" r="4" fill="#fef08a" /></g>` },
+          { id: "toilet", name: "Toilet", phonetic: "/ˈtɔɪ.lət/", icon: "toilet", desc: "The essential porcelain seat in the bathroom used for going to the potty, which flushes with water.", svg: `<g class="interactive-item" id="item-toilet"><rect x="620" y="280" width="110" height="150" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="4" /><rect x="635" y="300" width="20" height="8" rx="2" fill="#94a3b8" /><path d="M570,410 C570,360 660,360 660,410 L650,510 C650,520 590,520 590,510 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="4" /><ellipse cx="610" cy="400" rx="55" ry="15" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3" /><ellipse cx="610" cy="395" rx="55" ry="10" fill="#ffffff" /></g>` },
+          { id: "towel", name: "Towel", phonetic: "/ˈtaʊ.əl/", icon: "scroll", desc: "A soft, fluffy cloth used to dry our body and hands after washing up or taking a warm bath.", svg: `<g class="interactive-item" id="item-towel"><rect x="490" y="110" width="60" height="8" rx="3" fill="#94a3b8" /><rect x="500" y="118" width="40" height="110" rx="4" fill="#a5f3fc" /><line x1="500" y1="210" x2="540" y2="210" stroke="#22d3ee" stroke-width="3" /><line x1="500" y1="215" x2="540" y2="215" stroke="#22d3ee" stroke-width="3" /><path d="M510,118 L510,114 Q520,110 530,114 L530,118" fill="none" stroke="#22d3ee" stroke-width="3" /></g>` },
+          { id: "rug", name: "Bath Rug", phonetic: "/rʌɡ/", icon: "border-all", desc: "A soft, fluffy mat on the cold floor to keep our feet warm and dry after a splashy bath.", svg: `<g class="interactive-item" id="item-rug"><ellipse cx="300" cy="530" rx="100" ry="22" fill="#22d3ee" stroke="#0891b2" stroke-width="3" /><ellipse cx="300" cy="530" rx="80" ry="15" fill="none" stroke="#e0f7fa" stroke-width="2" stroke-dasharray="6 3" /><ellipse cx="300" cy="530" rx="55" ry="10" fill="none" stroke="#e0f7fa" stroke-width="1.5" /></g>` }
+        ]
+      },
+      yard: {
+        title: "Backyard", icon: "tree", color: "#ecfdf5", wallColor: "#bae6fd", floorColor: "#22c55e",
+        items: [
+          { id: "tree", name: "Tree", phonetic: "/triː/", icon: "tree", desc: "A tall wooden plant with green leaves, strong branches for climbing, and lovely singing birds.", svg: `<g class="interactive-item" id="item-tree"><path d="M140,510 L160,280 Q170,260 190,260 L210,280 L230,510 Z" fill="#78350f" /><path d="M190,510 L200,320 L210,510 Z" fill="#451a03" opacity="0.3" /><circle cx="130" cy="240" r="60" fill="#15803d" /><circle cx="230" cy="230" r="65" fill="#15803d" /><circle cx="180" cy="180" r="75" fill="#166534" /><circle cx="180" cy="240" r="50" fill="#15803d" /><circle cx="110" cy="220" r="10" fill="#ef4444" /><circle cx="210" cy="190" r="10" fill="#ef4444" /><circle cx="160" cy="160" r="10" fill="#ef4444" /><circle cx="240" cy="250" r="10" fill="#ef4444" /></g>` },
+          { id: "doghouse", name: "Doghouse", phonetic: "/ˈdɒɡ.haʊs/", icon: "house-user", desc: "A mini cozy shelter with a red triangular roof where the family dog sleeps and keeps safe.", svg: `<g class="interactive-item" id="item-doghouse"><rect x="360" y="380" width="140" height="130" fill="#d97706" rx="5" /><polygon points="340,380 430,290 520,380" fill="#dc2626" /><path d="M400,510 L400,430 C400,410 460,410 460,430 L460,510 Z" fill="#451a03" /><rect x="405" y="340" width="50" height="15" rx="7" fill="#f1f5f9" /><circle cx="405" cy="342" r="7" fill="#f1f5f9" /><circle cx="405" cy="352" r="7" fill="#f1f5f9" /><circle cx="455" cy="342" r="7" fill="#f1f5f9" /><circle cx="455" cy="352" r="7" fill="#f1f5f9" /><text x="417" y="352" font-size="10" font-family="sans-serif" font-weight="bold" fill="#475569">PUP</text></g>` },
+          { id: "grill", name: "BBQ Grill", phonetic: "/ˌbɑːr.bə.kjuː ɡrɪl/", icon: "fire-burner", desc: "A metal cooker where we grill yummy hamburgers, sweet corn, and hot dogs in the summer sunshine.", svg: `<g class="interactive-item" id="item-grill"><line x1="600" y1="420" x2="570" y2="520" stroke="#475569" stroke-width="8" stroke-linecap="round" /><line x1="640" y1="420" x2="670" y2="520" stroke="#475569" stroke-width="8" stroke-linecap="round" /><line x1="620" y1="420" x2="620" y2="520" stroke="#475569" stroke-width="8" stroke-linecap="round" /><circle cx="570" cy="520" r="14" fill="#0f172a" /><circle cx="670" cy="520" r="14" fill="#0f172a" /><line x1="585" y1="480" x2="655" y2="480" stroke="#94a3b8" stroke-width="6" /><path d="M570,360 C570,430 670,430 670,360 Z" fill="#1e293b" /><path d="M670,350 C670,280 750,300 740,360 Z" fill="#1e293b" /><rect x="550" y="360" width="20" height="8" rx="2" fill="#ef4444" /><ellipse cx="620" cy="355" rx="40" ry="10" fill="#f97316" opacity="0.6" /><circle cx="610" cy="320" r="12" fill="#cbd5e1" opacity="0.4" /><circle cx="630" cy="300" r="15" fill="#cbd5e1" opacity="0.3" /></g>` },
+          { id: "flower", name: "Flowers", phonetic: "/ˈflaʊ.ərz/", icon: "seedling", desc: "Beautiful, sweet-smelling plants growing in the garden that attract busy bees and butterflies.", svg: `<g class="interactive-item" id="item-flower"><ellipse cx="505" cy="520" rx="55" ry="15" fill="#78350f" /><path d="M475,515 Q470,480 472,475 M472,475 Q465,485 460,495 M475,515 Q485,490 478,480" stroke="#16a34a" stroke-width="3" fill="none" /><path d="M505,520 Q500,480 503,465 M503,465 Q515,480 520,495" stroke="#16a34a" stroke-width="3" fill="none" /><path d="M535,515 Q540,480 538,470" stroke="#16a34a" stroke-width="3" fill="none" /><circle cx="472" cy="470" r="8" fill="#f43f5e" /><polygon points="466,468 472,460 478,468" fill="#f43f5e" /><circle cx="503" cy="460" r="9" fill="#fbbf24" /><circle cx="503" cy="460" r="3" fill="#f59e0b" /><circle cx="538" cy="466" r="8" fill="#a78bfa" /><polygon points="532,464 538,456 544,464" fill="#a78bfa" /></g>` },
+          { id: "swing", name: "Swing", phonetic: "/swɪŋ/", icon: "hands-holding", desc: "A fun rubber tire seat hanging from a strong oak branch that lets us glide high through the clean backyard air.", svg: `<g class="interactive-item" id="item-swing"><line x1="220" y1="210" x2="215" y2="385" stroke="#78350f" stroke-width="3" /><line x1="240" y1="210" x2="235" y2="385" stroke="#78350f" stroke-width="3" /><ellipse cx="225" cy="385" rx="20" ry="8" fill="#0f172a" /><ellipse cx="225" cy="388" rx="24" ry="9" fill="#1e293b" /><ellipse cx="225" cy="385" rx="12" ry="4" fill="#22c55e" /></g>` }
+        ]
+      }
+    };
+
+    // ============================================================
+    // FIX 1: Single shared AudioContext — Edge caps concurrent instances
+    // ============================================================
+    let sharedAudioCtx = null;
+
+    function getAudioCtx() {
+      try {
+        if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+          sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (sharedAudioCtx.state === 'suspended') {
+          sharedAudioCtx.resume();
+        }
+        return sharedAudioCtx;
+      } catch (e) {
+        console.warn("AudioContext error:", e);
+        return null;
+      }
+    }
+
+    // ============================================================
+    // FIX 2: Voice loading with polling fallback for Edge
+    // ============================================================
+    const synth = window.speechSynthesis;
+    let selectedVoice = null;
+    let voicesReady = false;
+
+    function populateVoices() {
+      if (!synth) return;
+      const voices = synth.getVoices();
+      if (!voices || voices.length === 0) return;
+      voicesReady = true;
+      // Edge prefers its "Microsoft" neural voices; fall through to Google or any English voice
+      selectedVoice =
+        voices.find(v => v.lang.startsWith('en') && v.name.includes('Microsoft') && v.name.includes('Natural')) ||
+        voices.find(v => v.lang.startsWith('en') && v.name.includes('Microsoft')) ||
+        voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+        voices.find(v => v.lang.startsWith('en-US')) ||
+        voices.find(v => v.lang.startsWith('en')) ||
+        voices[0] || null;
+    }
+
+    function waitForVoices(timeoutMs = 5000) {
+      return new Promise((resolve) => {
+        if (voicesReady && selectedVoice) { resolve(); return; }
+        populateVoices();
+        if (voicesReady && selectedVoice) { resolve(); return; }
+        const start = Date.now();
+        const poll = setInterval(() => {
+          populateVoices();
+          if (voicesReady || Date.now() - start > timeoutMs) {
+            clearInterval(poll);
+            resolve();
+          }
+        }, 150);
+      });
+    }
+
+    // Hook standard event + start polling immediately
+    if (typeof speechSynthesis !== 'undefined') {
+      if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = populateVoices;
+      }
+      setTimeout(populateVoices, 0);
+    }
+
+    // Web Speech API Voice Recognition setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isRecordingSpeech = false;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+    }
+
+    window.onload = function() {
+      populateVoices();
+      updateChecklist();
+      setupGlobalHoverListeners();
+    };
+
+    // ============================================================
+    // FIX 3: unlockAudioAndStart — removed empty utterance trick
+    // ============================================================
+    function unlockAudioAndStart() {
+      // Resume/create shared AudioContext on first user gesture
+      try {
+        const ctx = getAudioCtx();
+        if (ctx) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.05);
+        }
+      } catch (err) {
+        console.warn("AudioContext unlock failed:", err);
+      }
+
+      // FIX: Do NOT speak empty string — it corrupts Edge's speech queue.
+      // Just cancel any stale queue and warm up voice loading.
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        waitForVoices();
+      }
+
+      // Remove Welcome Overlay
+      const landing = document.getElementById('welcome-landing');
+      if (landing) {
+        landing.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => { landing.remove(); }, 500);
+      }
+
+      goToRoom('living');
+      setTimeout(() => {
+        speakAudio("Welcome to House Explorer! Explore the rooms or try the Quiz Arena!");
+      }, 900);
+    }
+
+    function goToRoom(roomId) {
+      if (!roomsData[roomId]) return;
+      const prevRoomBtn = document.getElementById(`nav-${currentRoom}`);
+      if (prevRoomBtn) prevRoomBtn.className = "room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all text-slate-600 hover:bg-slate-50";
+      const activeBtn = document.getElementById(`nav-${roomId}`);
+      if (activeBtn) activeBtn.className = "room-nav-btn py-3 rounded-xl flex flex-col items-center justify-center transition-all bg-blue-500 text-white shadow-md";
+      playSystemSound('swoosh');
+      const corridor = document.getElementById('hallway-transition');
+      const targetText = document.getElementById('transition-target-text');
+      targetText.textContent = `Entering the ${roomsData[roomId].title}`;
+      corridor.classList.remove('hidden');
+      setTimeout(() => { corridor.style.opacity = '1'; }, 10);
+      setTimeout(() => {
+        currentRoom = roomId;
+        renderRoomSVG();
+        updateChecklist();
+        corridor.style.opacity = '0';
+        setTimeout(() => { corridor.classList.add('hidden'); }, 300);
+      }, 700);
+      resetSelection();
+    }
+
+    function navigateRoom(direction) {
+      const currentIndex = roomsOrder.indexOf(currentRoom);
+      let nextIndex = currentIndex + direction;
+      if (nextIndex >= roomsOrder.length) nextIndex = 0;
+      if (nextIndex < 0) nextIndex = roomsOrder.length - 1;
+      goToRoom(roomsOrder[nextIndex]);
+    }
+
+    function renderRoomSVG() {
+      const room = roomsData[currentRoom];
+      const svg = document.getElementById('room-svg');
+      document.getElementById('room-title').textContent = room.title;
+      document.getElementById('room-icon-badge').innerHTML = `<i class="fa-solid fa-${room.icon}"></i>`;
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="wall-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="100%" stop-color="${room.wallColor}" />
+          </linearGradient>
+          <linearGradient id="floor-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="${room.floorColor}" />
+            <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0.1" />
+          </linearGradient>
+          <linearGradient id="lamp-glow" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fef08a" stop-opacity="1" />
+            <stop offset="100%" stop-color="#eab308" stop-opacity="0" />
+          </linearGradient>
+          <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+            <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.15" />
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="800" height="420" fill="url(#wall-grad)" />
+        <rect x="0" y="420" width="800" height="180" fill="${currentRoom === 'yard' ? room.floorColor : 'url(#floor-grad)'}" />
+        ${currentRoom !== 'yard' ? `<rect x="0" y="415" width="800" height="8" fill="#475569" opacity="0.3" />` : ''}
+        ${generateFloorPlanks(currentRoom)}
+        ${renderRoomDecorations(currentRoom)}
+        <g id="items-layer"></g>
+      `;
+      const itemsLayer = document.getElementById('items-layer');
+      room.items.forEach(item => {
+        const itemGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        itemGroup.setAttribute("id", `group-${item.id}`);
+        itemGroup.setAttribute("class", "group cursor-pointer transition-transform duration-200");
+        itemGroup.innerHTML = item.svg;
+        itemGroup.addEventListener('click', (e) => { e.stopPropagation(); handleItemInteraction(item); });
+        itemGroup.addEventListener('mousemove', (e) => { showHoverTooltip(e, item); });
+        itemGroup.addEventListener('mouseleave', () => { hideHoverTooltip(); });
+        itemsLayer.appendChild(itemGroup);
+      });
+      if (appMode === 'challenge' && currentChallengeItem && challengeActive) {
+        if (quizGameType === 'find') highlightChallengeTarget();
+        else highlightQuizFocusTarget();
+      }
+    }
+
+    function generateFloorPlanks(roomType) {
+      if (roomType === 'yard') return `<path d="M50,450 L53,440 L56,450 M120,490 L123,480 L126,490 M340,430 L343,422 L346,430 M560,460 L563,450 L566,460 M710,480 L713,470 L716,480" stroke="#16a34a" stroke-width="4" stroke-linecap="round" fill="none" />`;
+      if (roomType === 'bathroom') return `<path d="M0,450 L800,450 M0,500 L800,500 M0,550 L800,550 M100,420 L100,600 M250,420 L250,600 M400,420 L400,600 M550,420 L550,600 M700,420 L700,600" stroke="#cbd5e1" stroke-width="1.5" stroke-opacity="0.5" />`;
+      return `<line x1="0" y1="450" x2="800" y2="450" stroke="#000" stroke-width="2" stroke-opacity="0.08" /><line x1="0" y1="490" x2="800" y2="490" stroke="#000" stroke-width="2" stroke-opacity="0.08" /><line x1="0" y1="530" x2="800" y2="530" stroke="#000" stroke-width="2" stroke-opacity="0.08" /><line x1="0" y1="570" x2="800" y2="570" stroke="#000" stroke-width="2" stroke-opacity="0.08" />`;
+    }
+
+    function renderRoomDecorations(roomType) {
+      switch (roomType) {
+        case 'kitchen': return `<line x1="50" y1="60" x2="200" y2="60" stroke="#94a3b8" stroke-width="4" /><circle cx="70" cy="90" r="15" fill="#cbd5e1" stroke="#475569" stroke-width="2" /><line x1="70" y1="60" x2="70" y2="75" stroke="#475569" stroke-width="2" /><circle cx="130" cy="100" r="18" fill="#fda4af" stroke="#e11d48" stroke-width="2" /><line x1="130" y1="60" x2="130" y2="82" stroke="#e11d48" stroke-width="2" /><rect x="290" y="160" width="490" height="60" fill="#e2e8f0" opacity="0.4" />`;
+        case 'bedroom': return `<line x1="280" y1="0" x2="280" y2="80" stroke="#cbd5e1" stroke-width="1.5" /><polygon points="280,75 283,82 290,82 285,86 287,93 280,89 273,93 275,86 270,82 277,82" fill="#fbf719" /><line x1="330" y1="0" x2="330" y2="120" stroke="#cbd5e1" stroke-width="1.5" /><polygon points="330,115 333,122 340,122 335,126 337,133 330,129 323,133 325,126 320,122 327,122" fill="#fbf719" />`;
+        case 'bathroom': return `<rect x="560" y="240" width="60" height="10" rx="3" fill="#cbd5e1" /><rect x="570" y="225" width="15" height="15" rx="4" fill="#a7f3d0" /><rect x="592" y="228" width="15" height="12" rx="4" fill="#fecdd3" />`;
+        case 'yard': return `<circle cx="70" cy="80" r="35" fill="white" opacity="0.9" /><circle cx="110" cy="80" r="25" fill="white" opacity="0.9" /><circle cx="700" cy="70" r="45" fill="#fef08a" opacity="0.5" /><circle cx="700" cy="70" r="30" fill="#f59e0b" /><g opacity="0.2"><path d="M0,320 L20,290 L40,320 L40,420 L0,420 Z M40,320 L60,290 L80,320 L80,420 L40,420 Z M80,320 L100,290 L120,320 L120,420 L80,420 Z M120,320 L140,290 L160,320 L160,420 L120,420 Z M460,320 L480,290 L500,320 L500,420 L460,420 Z M500,320 L520,290 L540,320 L540,420 L500,420 Z M540,320 L560,290 L580,320 L580,420 L540,420 Z M580,320 L600,290 L620,320 L620,420 L580,420 Z" fill="#78350f" /><rect x="0" y="380" width="800" height="15" fill="#78350f" /></g>`;
+        default: return '';
+      }
+    }
+
+    function toggleSound() {
+      soundEffectsEnabled = !soundEffectsEnabled;
+      const btn = document.getElementById('sound-toggle-btn');
+      const icon = document.getElementById('sound-icon');
+      if (soundEffectsEnabled) {
+        btn.className = "bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100 p-2.5 rounded-xl transition-all";
+        icon.className = "fa-solid fa-volume-high text-lg";
+        triggerToast("Sound Enabled", "Audio notifications and guides turned ON.", "fa-volume-high");
+      } else {
+        btn.className = "bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100 p-2.5 rounded-xl transition-all";
+        icon.className = "fa-solid fa-volume-xmark text-lg";
+        triggerToast("Sound Muted", "Audio guidance is muted, except speech engine.", "fa-volume-xmark");
+      }
+    }
+
+    // ============================================================
+    // FIX 4: playSystemSound — uses shared AudioContext
+    // ============================================================
+    function playSystemSound(type) {
+      if (!soundEffectsEnabled) return;
+      try {
+        const audioCtx = getAudioCtx();
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        if (type === 'success') {
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+          osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+          osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.3);
+          gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.55);
+        } else if (type === 'fail') {
+          osc.frequency.setValueAtTime(220.00, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(146.83, audioCtx.currentTime + 0.15);
+          gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.45);
+        } else if (type === 'click') {
+          osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.1);
+          gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+        } else if (type === 'swoosh') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(450, audioCtx.currentTime + 0.25);
+          gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        }
+      } catch (err) {
+        console.warn("playSystemSound error:", err);
+      }
+    }
+
+    function changeMode(mode) {
+      if (mode === appMode) return;
+      appMode = mode;
+      playSystemSound('click');
+      const exploreBtn = document.getElementById('btn-mode-explore');
+      const challengeBtn = document.getElementById('btn-mode-challenge');
+      const explorePanel = document.getElementById('panel-explore');
+      const challengePanel = document.getElementById('panel-challenge');
+      const instructionBadge = document.getElementById('instruction-badge');
+      if (mode === 'explore') {
+        exploreBtn.className = "px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all bg-white text-blue-600 shadow-sm";
+        challengeBtn.className = "px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all text-slate-600 hover:text-slate-800";
+        explorePanel.classList.remove('hidden');
+        challengePanel.classList.add('hidden');
+        instructionBadge.textContent = "Click on any object to hear it!";
+        challengeActive = false;
+        renderRoomSVG();
+      } else {
+        challengeBtn.className = "px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all bg-white text-indigo-600 shadow-sm";
+        exploreBtn.className = "px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all text-slate-600 hover:text-slate-800";
+        challengePanel.classList.remove('hidden');
+        explorePanel.classList.add('hidden');
+        instructionBadge.textContent = "Welcome to the Quiz Arena!";
+        resetSelection();
+        startListeningChallenge();
+      }
+    }
+
+    function showHoverTooltip(event, item) {
+      const tooltip = document.getElementById('hover-tooltip');
+      document.getElementById('hover-tooltip-name').textContent = item.name;
+      document.getElementById('hover-tooltip-phonetic').textContent = item.phonetic;
+      const rect = document.getElementById('canvas-wrapper').getBoundingClientRect();
+      tooltip.style.left = `${event.clientX - rect.left + 15}px`;
+      tooltip.style.top = `${event.clientY - rect.top - 60}px`;
+      tooltip.style.opacity = '1';
+    }
+
+    function hideHoverTooltip() {
+      document.getElementById('hover-tooltip').style.opacity = '0';
+    }
+
+    function setupGlobalHoverListeners() {
+      document.getElementById('canvas-wrapper').addEventListener('mouseleave', () => { hideHoverTooltip(); });
+    }
+
+    function setQuizGameType(type) {
+      if (quizGameType === type) return;
+      quizGameType = type;
+      playSystemSound('click');
+      ['find', 'match', 'speak', 'complete'].forEach(t => {
+        const btn = document.getElementById(`btn-quiz-${t}`);
+        btn.className = t === type
+          ? "py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all bg-indigo-600 text-white shadow"
+          : "py-1.5 px-2 rounded-xl text-[10px] font-bold text-center transition-all text-indigo-300 hover:text-white";
+        const panel = document.getElementById(`panel-sub-${t}`);
+        if (panel) { if (t === type) panel.classList.remove('hidden'); else panel.classList.add('hidden'); }
+      });
+      const riddleToggle = document.getElementById('riddle-toggle-container');
+      if (type === 'find') riddleToggle.classList.remove('hidden'); else riddleToggle.classList.add('hidden');
+      if (challengeActive) startListeningChallenge();
+    }
+
+    function setChallengeType(type) {
+      if (challengeType === type) return;
+      challengeType = type;
+      playSystemSound('click');
+      const standardBtn = document.getElementById('btn-challenge-standard');
+      const riddleBtn = document.getElementById('btn-challenge-riddle');
+      const riddleBox = document.getElementById('challenge-riddle-box');
+      if (type === 'standard') {
+        standardBtn.className = "flex-1 py-1 rounded-lg text-[10px] text-center transition-all bg-indigo-600 text-white";
+        riddleBtn.className = "flex-1 py-1 rounded-lg text-[10px] text-center transition-all text-indigo-300 hover:text-white";
+        riddleBox.classList.add('hidden');
+      } else {
+        riddleBtn.className = "flex-1 py-1 rounded-lg text-[10px] text-center transition-all bg-purple-600 text-white";
+        standardBtn.className = "flex-1 py-1 rounded-lg text-[10px] text-center transition-all text-indigo-300 hover:text-white";
+        riddleBox.classList.remove('hidden');
+      }
+      if (challengeActive) startListeningChallenge();
+    }
+
+    function resetSelection() {
+      selectedItem = null;
+      document.getElementById('item-details-empty').classList.remove('hidden');
+      document.getElementById('item-details-full').classList.add('hidden');
+      document.getElementById('ai-facts-box').classList.add('hidden');
+    }
+
+    function speakSelected() {
+      if (!selectedItem) return;
+      speakAudio(selectedItem.name);
+    }
+
+    async function fetchWithBackoff(url, options, maxRetries = 5) {
+      let delay = 1000;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const response = await fetch(url, options);
+          if (response.ok) return response;
+          if (response.status !== 429 && (response.status < 500 || response.status >= 600)) return response;
+        } catch (error) {
+          if (i === maxRetries - 1) throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      }
+      throw new Error("API call failed after max retries.");
+    }
+
+    function encodeWAV(l16Buffer, sampleRate) {
+      const l16View = new DataView(l16Buffer);
+      const numSamples = l16Buffer.byteLength / 2;
+      const wavBuffer = new ArrayBuffer(44 + numSamples * 2);
+      const wavView = new DataView(wavBuffer);
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+      }
+      writeString(wavView, 0, 'RIFF');
+      wavView.setUint32(4, 36 + numSamples * 2, true);
+      writeString(wavView, 8, 'WAVE');
+      writeString(wavView, 12, 'fmt ');
+      wavView.setUint32(16, 16, true);
+      wavView.setUint16(20, 1, true);
+      wavView.setUint16(22, 1, true);
+      wavView.setUint32(24, sampleRate, true);
+      wavView.setUint32(28, sampleRate * 2, true);
+      wavView.setUint16(32, 2, true);
+      wavView.setUint16(34, 16, true);
+      writeString(wavView, 36, 'data');
+      wavView.setUint32(40, numSamples * 2, true);
+      let offset = 44;
+      for (let i = 0; i < numSamples; i++) {
+        wavView.setInt16(offset, l16View.getInt16(i * 2, false), true);
+        offset += 2;
+      }
+      return wavBuffer;
+    }
+
+    // ============================================================
+    // FIX 5: playRawNeuralPCM — fallback to web speech if blob blocked
+    // ============================================================
+    function playRawNeuralPCM(base64Data, mimeType, fallbackText) {
+      try {
+        const binaryString = window.atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+        let sampleRate = 24000;
+        const rateMatch = mimeType.match(/rate=(\d+)/);
+        if (rateMatch) sampleRate = parseInt(rateMatch[1], 10);
+        const wavBytes = encodeWAV(bytes.buffer, sampleRate);
+        const blob = new Blob([wavBytes], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play().catch(e => {
+          console.warn("Blob audio blocked, falling back to Web Speech:", e);
+          if (fallbackText) speakWebSpeech(fallbackText);
+        });
+      } catch (err) {
+        console.error("PCM-to-WAV error:", err);
+        if (fallbackText) speakWebSpeech(fallbackText);
+      }
+    }
+
+    function showSubtitleText(text) {
+      const subContainer = document.getElementById('speech-subtitles');
+      const subText = document.getElementById('speech-subtitles-text');
+      if (!subContainer || !subText) return;
+      subText.textContent = `"${text}"`;
+      subContainer.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      subContainer.classList.add('opacity-100', 'translate-y-0');
+      if (window.subtitleTimeout) clearTimeout(window.subtitleTimeout);
+      window.subtitleTimeout = setTimeout(() => {
+        subContainer.classList.remove('opacity-100', 'translate-y-0');
+        subContainer.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+      }, Math.max(2500, text.length * 65));
+    }
+
+    // ============================================================
+    // FIX 6: speakWebSpeech — Edge-safe Web Speech implementation
+    // ============================================================
+    async function speakWebSpeech(textToSay) {
+      if (!('speechSynthesis' in window)) return;
+
+      window.speechSynthesis.cancel();
+      await waitForVoices();
+
+      // Small settled delay after cancel — use 50ms, NOT 100ms which Edge can silently drop
+      await new Promise(r => setTimeout(r, 50));
+
+      const utterance = new SpeechSynthesisUtterance(textToSay);
+      // Bind globally to prevent Chrome/Edge GC killing utterance mid-speech
+      window.activeUtterance = utterance;
+
+      // FIX: Only assign voice if valid — Edge fails silently with null/undefined voice
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+      } else {
+        utterance.lang = 'en-US';
+      }
+
+      utterance.rate = 0.92;
+      utterance.pitch = 1.05;
+      utterance.volume = 1.0;
+
+      // Edge watchdog — Edge sometimes pauses speechSynthesis mid-utterance
+      let watchdog = null;
+
+      utterance.onstart = () => {
+        watchdog = setInterval(() => {
+          if (!window.speechSynthesis.speaking) { clearInterval(watchdog); return; }
+          if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+        }, 500);
+      };
+
+      utterance.onend = () => {
+        window.activeUtterance = null;
+        if (watchdog) clearInterval(watchdog);
+      };
+
+      utterance.onerror = (event) => {
+        if (event.error !== 'interrupted' && event.error !== 'canceled') {
+          console.warn("Speech error:", event.error);
+        }
+        window.activeUtterance = null;
+        if (watchdog) clearInterval(watchdog);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ============================================================
+    // FIX 7: speakAudio — passes fallbackText to PCM player
+    // ============================================================
+    async function speakAudio(textToSay) {
+      showSubtitleText(textToSay);
+
+      const selectedEngine = document.getElementById('voice-engine-select').value;
+
+      if (selectedEngine === 'api' && apiKey) {
+        try {
+          const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+          const requestData = {
+            contents: [{ parts: [{ text: `Say in a warm, child-friendly, expressive teacher voice: ${textToSay}` }] }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+            },
+            model: "gemini-2.5-flash-preview-tts"
+          };
+          const response = await fetchWithBackoff(apiURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestData)
+          });
+          if (!response.ok) throw new Error("API Voice status: " + response.status);
+          const result = await response.json();
+          const pcmPart = result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (pcmPart && pcmPart.data) {
+            // Pass textToSay as fallback if Edge blocks the blob audio
+            playRawNeuralPCM(pcmPart.data, pcmPart.mimeType || "audio/L16;rate=24000", textToSay);
+            return;
+          }
+        } catch (e) {
+          console.warn("Neural voice failed, falling back:", e.message);
+        }
+      }
+
+      speakWebSpeech(textToSay);
+    }
+
+    async function askAIFunFacts() {
+      if (!selectedItem) return;
+      const btn = document.getElementById('btn-ai-facts');
+      const factsBox = document.getElementById('ai-facts-box');
+      const factsText = document.getElementById('ai-facts-text');
+      factsBox.classList.remove('hidden');
+      factsText.innerHTML = "Asking the AI wizard for mind-blowing facts... <div class='w-full h-3 shimmer-loading rounded mt-2'></div>";
+      btn.disabled = true;
+      btn.classList.add('opacity-70');
+      const fallbackFact = fallbackFacts[selectedItem.id] || `Did you know that the ${selectedItem.name} is one of the most useful things in our homes?`;
+      try {
+        if (!apiKey) throw new Error("No API Key");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const response = await fetchWithBackoff(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Generate a fun, extremely engaging, and kid-friendly fun fact (2 sentences maximum) about the following household item: "${selectedItem.name}". Make it exciting, and start with 'Did you know...?'` }] }],
+            systemInstruction: { parts: [{ text: "You are a friendly, witty, and educational AI assistant inside a kids vocabulary game. Keep facts punchy, humorous, and highly engaging for 6-10 year olds." }] }
+          })
+        });
+        if (!response.ok) throw new Error("API status: " + response.status);
+        const result = await response.json();
+        const aiFact = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (aiFact) { factsText.textContent = aiFact.trim(); speakAudio(aiFact); }
+        else throw new Error("Empty content");
+      } catch (err) {
+        factsText.textContent = fallbackFact;
+        speakAudio(fallbackFact);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70');
+      }
+    }
+
+    async function generateAIRiddle(targetItem) {
+      const riddleTextElem = document.getElementById('challenge-riddle-text');
+      riddleTextElem.innerHTML = "AI is cooking up a riddle... <div class='w-full h-3 shimmer-loading rounded mt-2'></div>";
+      const fallbackRiddle = fallbackRiddles[targetItem.id] || `I am an item in the house. Can you find the ${targetItem.name}?`;
+      try {
+        if (!apiKey) throw new Error("No API Key");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const response = await fetchWithBackoff(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Create a simple 1-sentence riddle for kids about this item: "${targetItem.name}". Do NOT mention the word "${targetItem.name}" in the riddle.` }] }],
+            systemInstruction: { parts: [{ text: "You are a gamified riddle companion. Generate a simple, cute 1-sentence riddle with sensory clues like color, shape, or purpose." }] },
+            generationConfig: { responseMimeType: "application/json", responseSchema: { type: "OBJECT", properties: { riddle: { type: "STRING" } }, required: ["riddle"] } }
+          })
+        });
+        if (!response.ok) throw new Error("API call failed");
+        const result = await response.json();
+        const rawJson = JSON.parse(result.candidates[0].content.parts[0].text);
+        activeRiddleText = rawJson.riddle;
+        riddleTextElem.textContent = activeRiddleText;
+        replayChallengeSound();
+      } catch (err) {
+        activeRiddleText = fallbackRiddle;
+        riddleTextElem.textContent = activeRiddleText;
+        replayChallengeSound();
+      }
+    }
+
+    function updateChecklist() {
+      const checklistContainer = document.getElementById('room-checklist');
+      checklistContainer.innerHTML = '';
+      roomsData[currentRoom].items.forEach(item => {
+        const isFound = discoveredItems[item.id] || false;
+        const badge = document.createElement('div');
+        badge.className = `p-2 rounded-xl text-xs flex items-center justify-between border transition-all ${isFound ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100 hover:border-slate-300 cursor-pointer'}`;
+        badge.onclick = () => { if (!isFound) handleItemInteraction(item); };
+        badge.innerHTML = `<span class="font-bold truncate">${item.name}</span><span><i class="fa-solid ${isFound ? 'fa-circle-check text-emerald-500' : 'fa-circle text-slate-200'}"></i></span>`;
+        checklistContainer.appendChild(badge);
+      });
+    }
+
+    function startListeningChallenge() {
+      const roomKeys = Object.keys(roomsData);
+      currentChallengeRoomKey = roomKeys[Math.floor(Math.random() * roomKeys.length)];
+      const targetRoom = roomsData[currentChallengeRoomKey];
+      currentChallengeItem = targetRoom.items[Math.floor(Math.random() * targetRoom.items.length)];
+      challengeActive = true;
+      document.getElementById('challenge-state-init').classList.add('hidden');
+      document.getElementById('challenge-state-active').classList.remove('hidden');
+      document.getElementById('challenge-room-hint').innerHTML = `<span class="font-bold">Hint:</span> Search in the <span class="text-white underline font-semibold">${targetRoom.title}</span>!`;
+      if (currentRoom !== currentChallengeRoomKey) goToRoom(currentChallengeRoomKey);
+      else renderRoomSVG();
+      if (quizGameType === 'find') setupFindObjectGame();
+      else if (quizGameType === 'match') setupMatchNameGame();
+      else if (quizGameType === 'speak') setupSpeakingPracticeGame();
+      else if (quizGameType === 'complete') setupCompleteWordGame();
+    }
+
+    function setupFindObjectGame() {
+      if (challengeType === 'riddle') {
+        document.getElementById('challenge-riddle-box').classList.remove('hidden');
+        generateAIRiddle(currentChallengeItem);
+      } else {
+        document.getElementById('challenge-riddle-box').classList.add('hidden');
+        setTimeout(() => { replayChallengeSound(); }, 950);
+      }
+    }
+
+    function setupMatchNameGame() {
+      const matchGrid = document.getElementById('match-options-grid');
+      matchGrid.innerHTML = '';
+      const pool = [];
+      Object.keys(roomsData).forEach(r => { roomsData[r].items.forEach(it => { if (it.id !== currentChallengeItem.id) pool.push(it); }); });
+      const shuffledWrong = pool.sort(() => 0.5 - Math.random()).slice(0, 2);
+      const options = [...shuffledWrong, currentChallengeItem].sort(() => 0.5 - Math.random());
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = "w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 shadow-sm transition-all text-left";
+        btn.textContent = opt.name;
+        btn.onclick = () => { if (opt.id === currentChallengeItem.id) handleCorrectSelection(currentChallengeItem); else handleWrongSelection(opt); };
+        matchGrid.appendChild(btn);
+      });
+      setTimeout(() => { speakAudio(`Which option matches the flashing object in the ${roomsData[currentChallengeRoomKey].title}?`); }, 500);
+    }
+
+    function setupSpeakingPracticeGame() {
+      document.getElementById('speak-target-word').textContent = currentChallengeItem.name;
+      document.getElementById('speak-status-text').textContent = "Click the mic and speak clearly";
+      document.getElementById('speak-result-text').classList.add('hidden');
+      setTimeout(() => { speakAudio(`Let's practice speaking. Pronounce the word: ${currentChallengeItem.name}`); }, 500);
+    }
+
+    function setupCompleteWordGame() {
+      const word = currentChallengeItem.name.toUpperCase();
+      spellingHiddenWord = word;
+      spellingBlanks = [];
+      for (let i = 0; i < word.length; i++) {
+        const char = word[i];
+        if (char === ' ') spellingBlanks.push({ char: ' ', isRevealed: true });
+        else if (i % 3 === 1 && char !== '-' && char !== '.') spellingBlanks.push({ char, isRevealed: false });
+        else spellingBlanks.push({ char, isRevealed: true });
+      }
+      renderSpellingBlanksUI();
+      const missingChars = spellingBlanks.filter(b => !b.isRevealed).map(b => b.char);
+      const randomFillers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").filter(c => !missingChars.includes(c)).sort(() => 0.5 - Math.random()).slice(0, 8 - missingChars.length);
+      const options = [...new Set([...missingChars, ...randomFillers])].sort();
+      const kbContainer = document.getElementById('spelling-keyboard-container');
+      kbContainer.innerHTML = '';
+      options.forEach(char => {
+        const keyBtn = document.createElement('button');
+        keyBtn.className = "py-2 bg-indigo-900 hover:bg-indigo-800 text-white font-bold rounded-lg text-xs shadow-md border border-indigo-800 transition-all active:scale-95";
+        keyBtn.textContent = char;
+        keyBtn.onclick = () => { handleSpellingKeyPress(char); };
+        kbContainer.appendChild(keyBtn);
+      });
+      setTimeout(() => { speakAudio(`Spell the word: ${currentChallengeItem.name}`); }, 500);
+    }
+
+    function renderSpellingBlanksUI() {
+      const container = document.getElementById('spelling-blank-container');
+      container.innerHTML = '';
+      spellingBlanks.forEach(b => {
+        const box = document.createElement('div');
+        if (b.char === ' ') { box.className = "w-3 h-8"; }
+        else {
+          box.className = `w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm border-2 ${b.isRevealed ? 'bg-indigo-900 text-indigo-100 border-indigo-700' : 'bg-indigo-950 text-yellow-400 border-dashed border-indigo-500 animate-pulse'}`;
+          box.textContent = b.isRevealed ? b.char : '?';
+        }
+        container.appendChild(box);
+      });
+    }
+
+    function handleSpellingKeyPress(selectedChar) {
+      let matchFound = false;
+      for (let i = 0; i < spellingBlanks.length; i++) {
+        if (!spellingBlanks[i].isRevealed && spellingBlanks[i].char === selectedChar) {
+          spellingBlanks[i].isRevealed = true;
+          matchFound = true;
+          playSystemSound('click');
+          break;
+        }
+      }
+      if (matchFound) {
+        renderSpellingBlanksUI();
+        if (spellingBlanks.every(b => b.isRevealed)) handleCorrectSelection(currentChallengeItem);
+      } else {
+        playSystemSound('fail');
+        triggerToast("Try Again!", `The letter ${selectedChar} is not in the missing slots!`, "fa-circle-xmark");
+      }
+    }
+
+    function startVoiceRecognition() {
+      if (!recognition) { triggerToast("Not Supported", "Speech recognition needs Google Chrome.", "fa-circle-exclamation"); return; }
+      if (isRecordingSpeech) { recognition.stop(); return; }
+      isRecordingSpeech = true;
+      const micBtn = document.getElementById('btn-speak-mic');
+      const micIcon = document.getElementById('mic-icon');
+      const statusText = document.getElementById('speak-status-text');
+      const resultText = document.getElementById('speak-result-text');
+      micBtn.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg hover:scale-105 active:scale-95 transition-all recording-active";
+      micIcon.className = "fa-solid fa-microphone-lines text-2xl animate-pulse text-white";
+      statusText.textContent = "Listening... Speak the word loudly!";
+      statusText.className = "text-xs text-red-400 font-bold animate-pulse";
+      resultText.classList.add('hidden');
+      recognition.start();
+      recognition.onresult = function(event) {
+        const spokenSpeech = event.results[0][0].transcript.trim().toLowerCase();
+        const expectedWord = currentChallengeItem.name.trim().toLowerCase();
+        resultText.textContent = `We heard: "${event.results[0][0].transcript}"`;
+        resultText.classList.remove('hidden');
+        if (spokenSpeech.includes(expectedWord) || expectedWord.includes(spokenSpeech)) handleCorrectSelection(currentChallengeItem);
+        else handleWrongSpeechInput(event.results[0][0].transcript);
+      };
+      recognition.onerror = function(event) { statusText.textContent = "Speech error. Tap to retry!"; stopSpeechRecordingUI(); };
+      recognition.onend = function() { stopSpeechRecordingUI(); };
+    }
+
+    function stopSpeechRecordingUI() {
+      isRecordingSpeech = false;
+      const micBtn = document.getElementById('btn-speak-mic');
+      micBtn.className = "w-16 h-16 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg hover:scale-105 active:scale-95 transition-all";
+      document.getElementById('mic-icon').className = "fa-solid fa-microphone text-2xl";
+      document.getElementById('speak-status-text').textContent = "Tap the mic to try again!";
+      document.getElementById('speak-status-text').className = "text-xs text-slate-400 italic";
+    }
+
+    function handleWrongSpeechInput(spokenText) {
+      playSystemSound('fail');
+      totalQuestions++;
+      updateChallengeMetrics();
+      const overlay = document.getElementById('feedback-overlay');
+      document.getElementById('feedback-title').textContent = "Try again!";
+      document.getElementById('feedback-text').textContent = `We heard: "${spokenText}". Target: ${currentChallengeItem.name}`;
+      document.getElementById('feedback-icon').className = "fa-solid fa-microphone-slash text-white text-xl";
+      overlay.className = "absolute inset-0 rounded-2xl flex flex-col items-center justify-center bg-rose-950/95 border-2 border-rose-500 z-20 transition-all scale-100";
+      overlay.classList.remove('hidden');
+      setTimeout(() => { overlay.classList.add('hidden'); }, 2500);
+    }
+
+    function handleItemInteraction(item) {
+      if (appMode === 'explore') {
+        selectedItem = item;
+        discoveredItems[item.id] = true;
+        updateChecklist();
+        document.getElementById('item-details-empty').classList.add('hidden');
+        document.getElementById('item-details-full').classList.remove('hidden');
+        document.getElementById('selected-item-name').textContent = item.name;
+        document.getElementById('selected-item-pronunciation').textContent = item.phonetic;
+        document.getElementById('selected-item-icon').className = `fa-solid fa-${item.icon} text-2xl`;
+        document.getElementById('selected-item-desc').textContent = `"${item.desc}"`;
+        document.getElementById('ai-facts-box').classList.add('hidden');
+        const elem = document.getElementById(`group-${item.id}`);
+        if (elem) { elem.style.transform = "scale(1.08)"; setTimeout(() => { elem.style.transform = "scale(1)"; }, 150); }
+        speakSelected();
+      } else {
+        if (!challengeActive) { triggerToast("Attention", "Tap 'Start Challenge' first!", "fa-circle-exclamation"); return; }
+        if (quizGameType === 'find') {
+          if (item.id === currentChallengeItem.id) handleCorrectSelection(item);
+          else handleWrongSelection(item);
+        } else {
+          triggerToast("Look Right!", "Answer using the Quiz Arena panel options!", "fa-circle-question");
+        }
+      }
+    }
+
+    function replayChallengeSound() {
+      if (!currentChallengeItem) return;
+      const button = document.getElementById('challenge-play-btn');
+      if (button) button.classList.add('scale-110', 'bg-indigo-500');
+      const textToSpeak = (quizGameType === 'find' && challengeType === 'riddle' && activeRiddleText) ? activeRiddleText : currentChallengeItem.name;
+      speakAudio(textToSpeak);
+      setTimeout(() => { if (button) button.classList.remove('scale-110', 'bg-indigo-500'); }, 500);
+    }
+
+    function highlightChallengeTarget() {
+      const itemGroup = document.getElementById(`group-${currentChallengeItem.id}`);
+      if (itemGroup) itemGroup.classList.add('game-target-active');
+    }
+
+    function highlightQuizFocusTarget() {
+      const itemGroup = document.getElementById(`group-${currentChallengeItem.id}`);
+      if (itemGroup) itemGroup.classList.add('quiz-target-highlight');
+    }
+
+    function handleCorrectSelection(item) {
+      score++; totalQuestions++;
+      challengeActive = false;
+      playSystemSound('success');
+      updateChallengeMetrics();
+      const overlay = document.getElementById('feedback-overlay');
+      document.getElementById('feedback-title').textContent = "Superb Job!";
+      document.getElementById('feedback-text').textContent = `Excellent! That is the ${item.name}!`;
+      document.getElementById('feedback-icon').className = "fa-solid fa-star text-white text-xl";
+      overlay.className = "absolute inset-0 rounded-2xl flex flex-col items-center justify-center bg-emerald-950/95 border-2 border-emerald-500 z-20 transition-all scale-100";
+      overlay.classList.remove('hidden');
+      const elem = document.getElementById(`group-${item.id}`);
+      if (elem) { elem.classList.remove('game-target-active'); elem.classList.remove('quiz-target-highlight'); }
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        if (score === 5) triggerCompletionReward();
+        else startListeningChallenge();
+      }, 2500);
+    }
+
+    function handleWrongSelection(item) {
+      totalQuestions++;
+      playSystemSound('fail');
+      updateChallengeMetrics();
+      const overlay = document.getElementById('feedback-overlay');
+      document.getElementById('feedback-title').textContent = "Not Quite!";
+      document.getElementById('feedback-text').textContent = `That's the ${item.name || 'incorrect option'}. Listen and try again!`;
+      document.getElementById('feedback-icon').className = "fa-solid fa-volume-high text-white text-xl animate-pulse";
+      overlay.className = "absolute inset-0 rounded-2xl flex flex-col items-center justify-center bg-rose-950/95 border-2 border-rose-500 z-20 transition-all scale-100";
+      overlay.classList.remove('hidden');
+      setTimeout(() => { overlay.classList.add('hidden'); replayChallengeSound(); }, 2200);
+    }
+
+    function updateChallengeMetrics() {
+      document.getElementById('score-val').textContent = score;
+      document.getElementById('total-val').textContent = totalQuestions;
+      const accuracy = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
+      document.getElementById('accuracy-percentage').textContent = `${accuracy}%`;
+      document.getElementById('accuracy-bar').style.width = `${accuracy}%`;
+    }
+
+    function triggerCompletionReward() {
+      playSystemSound('success');
+      document.getElementById('reward-modal').classList.remove('hidden');
+    }
+
+    function closeRewardModal() {
+      document.getElementById('reward-modal').classList.add('hidden');
+      score = 0; totalQuestions = 0;
+      updateChallengeMetrics();
+      changeMode('explore');
+    }
+
+    function triggerToast(title, body, iconClass = "fa-info") {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-body').textContent = body;
+      document.getElementById('toast-icon').className = `fa-solid ${iconClass}`;
+      toast.classList.remove('translate-y-24');
+      toast.classList.add('translate-y-0');
+      setTimeout(() => { toast.classList.add('translate-y-24'); toast.classList.remove('translate-y-0'); }, 3500);
+    }
+  </script>
+</body>
+</html>
